@@ -1,0 +1,64 @@
+version: "3.7"
+
+services:
+  php:
+    build:
+      context: .
+      dockerfile: docker/images/php/Dockerfile
+    container_name: ${COMPOSE_PROJECT_NAME}_php
+    environment:
+      MARVEL_API_PUBLIC_KEY: ${MARVEL_API_PUBLIC_KEY}
+      MARVEL_API_PRIVATE_KEY: ${MARVEL_API_PRIVATE_KEY}
+      MARVEL_API_GATEWAY: ${MARVEL_API_GATEWAY}
+    working_dir: /var/www/api
+    volumes:
+      - ./src/api:/var/www/api
+    user: 1000:1000
+    networks:
+      - marvel
+
+  db:
+    image: mysql:5.7.30
+    container_name: ${COMPOSE_PROJECT_NAME}_mysql
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: marvel
+      MYSQL_ROOT_PASSWORD: marvel
+      MYSQL_PASSWORD: marvel
+      MYSQL_USER: marvel
+    volumes:
+      - /dataDocker/${COMPOSE_PROJECT_NAME}:/var/lib/mysql
+    networks:
+      - marvel
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: ${COMPOSE_PROJECT_NAME}_nginx
+    ports:
+      - 8080:80
+      - 8090:8090
+    volumes:
+      - ./src/api:/var/www/api
+      - ./src/frontend:/var/www/frontend
+      - ./docker/conf/nginx/api.conf:/etc/nginx/conf.d/api.conf
+      - ./docker/conf/nginx/frontend.conf:/etc/nginx/conf.d/frontend.conf
+    depends_on:
+      - php
+      - db
+    networks:
+      - marvel
+
+  npm:
+    image: node:14.1
+    container_name: ${COMPOSE_PROJECT_NAME}_npm
+    working_dir: /var/www/frontend
+    volumes:
+      - ./src/frontend:/var/www/frontend
+    entrypoint: ['npm']
+
+networks:
+  marvel:
+    driver: bridge
